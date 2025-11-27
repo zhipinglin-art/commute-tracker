@@ -2,51 +2,75 @@
 
 本指南将帮助您将通勤时间记录应用部署到公网，使其能够在 iPhone 上访问，不受局域网限制。
 
-## 为什么选择 Railway？
+## 为什么选择 Render.com？（推荐）
 
-Railway 是一个现代化的云应用部署平台，具有以下优势：
-- 🆓 提供免费额度（足够个人使用）
+由于 Railway 免费计划限制，我们推荐使用 **Render.com**，它具有以下优势：
+- 🆓 完全免费用于 Web 服务部署
 - 🚀 部署速度快，几秒钟内完成
 - 🔄 自动从 GitHub 部署，代码推送即自动更新
 - 📱 支持 HTTPS，移动端友好
 - ⚙️ 无需复杂配置，自动检测项目类型
 
-## 部署步骤
+## 备选方案
 
-### 第一步：注册和登录 Railway
+### 1. Vercel
+- 主要用于前端，但支持 Python API
+- 部署速度快
+- 适合 API 和前端一同部署
 
-1. 访问 [railway.app](https://railway.app)
-2. 点击 "Login" 使用 GitHub 账号登录（推荐）
-3. 授权 Railway 访问您的 GitHub 仓库
+### 2. Heroku
+- 经典 PaaS 平台
+- 免费额度有限制
+- 适合小型应用
 
-### 第二步：创建新项目
+### 3. PythonAnywhere
+- 专门用于 Python 应用
+- 提供免费级别
+- 设置简单
 
-1. 登录后，点击 "New Project" 按钮
-2. 选择 "Deploy from GitHub repo"
-3. 从列表中选择您的 `commute-tracker` 仓库（https://github.com/zhipinglin-art/commute-tracker）
-4. 点击 "Deploy Now"
+## 部署步骤（以 Render.com 为例）
 
-Railway 会自动检测您的项目类型（FastAPI），并根据 `railway.json` 和 `Dockerfile` 配置进行部署。
+### 第一步：注册和登录 Render
 
-### 第三步：配置环境变量
+1. 访问 [render.com](https://render.com)
+2. 点击 "Sign Up" 使用 GitHub 账号注册（推荐）
+3. 授权 Render 访问您的 GitHub 仓库
 
-您的应用可能需要数据库连接。Railway 提供免费的 PostgreSQL 数据库：
+### 第二步：创建新 Web 服务
 
-1. 在项目页面，点击 "New Service" > "Add Database" > "Add PostgreSQL"
-2. 数据库创建后，点击它查看 "Connection URL"
-3. 在您的应用服务设置中，添加以下环境变量：
-   - `DB_HOST`: 从 PostgreSQL 连接 URL 中提取
-   - `DB_PORT`: 从 PostgreSQL 连接 URL 中提取
-   - `DB_USER`: 从 PostgreSQL 连接 URL 中提取
-   - `DB_PASSWORD`: 从 PostgreSQL 连接 URL 中提取
-   - `DB_NAME`: 从 PostgreSQL 连接 URL 中提取
+1. 登录后，点击 "New +" > "Web Service"
+2. 从列表中选择您的 `commute-tracker` 仓库（https://github.com/zhipinglin-art/commute-tracker）
+3. 配置部署设置（通常 Render 会自动检测 Python 项目）：
+   - Name: `commute-tracker`（或自定义）
+   - Region: 选择最近的区域
+   - Branch: `main`
+   - Runtime: `Python 3`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. 点击 "Create Web Service"
 
-或者，您也可以直接使用完整的 `DATABASE_URL` 环境变量（修改代码后使用）。
+Render 会自动部署您的应用，并根据 `render.yaml` 配置进行设置。
+
+### 第三步：配置环境变量（可选）
+
+您的应用可以使用 SQLite（默认）或 PostgreSQL：
+
+1. 如果要使用 PostgreSQL：
+   - 在项目页面，点击 "New +" > "PostgreSQL"
+   - 创建数据库后，查看 "Connection" 信息
+   - 在 Web Service 设置中，添加环境变量：
+     - `DB_HOST`: 从连接信息中获取
+     - `DB_PORT`: 从连接信息中获取
+     - `DB_USER`: 从连接信息中获取
+     - `DB_PASSWORD`: 从连接信息中获取
+     - `DB_NAME`: 从连接信息中获取
+
+2. 如果不配置这些变量，应用将自动使用 SQLite 数据库（无需额外配置）
 
 ### 第四步：获取公网 URL
 
-部署完成后，Railway 会为您的应用分配一个公网 URL：
-- 格式类似：`your-app-name.up.railway.app`
+部署完成后，Render 会为您的应用分配一个公网 URL：
+- 格式类似：`your-app-name.onrender.com`
 - 自动支持 HTTPS
 
 ### 第五步：在 iPhone 上使用
@@ -59,53 +83,40 @@ Railway 会自动检测您的项目类型（FastAPI），并根据 `railway.json
    - 应用图标将出现在主屏幕上，像原生应用一样使用
 3. **离线支持**：应用已配置 Service Worker，支持离线使用（但数据同步需要网络）
 
+## Vercel 部署步骤
+
+如果您更喜欢使用 Vercel：
+
+1. 访问 [vercel.com](https://vercel.com)
+2. 使用 GitHub 账号注册
+3. 点击 "New Project"
+4. 选择您的 `commute-tracker` 仓库
+5. Vercel 会自动检测项目并配置
+6. 点击 "Deploy"
+
+部署完成后，您会得到一个 `.vercel.app` 的 URL。
+
 ## 高级配置选项
 
 ### 自定义域名
 
 如果您想使用自己的域名：
-1. 在项目设置中点击 "Domains"
+1. 在 Render 项目设置中点击 "Custom Domains"
 2. 添加您的域名（例如：commute.example.com）
 3. 按照指示配置 DNS 记录
 
 ### 数据库初始化
 
 如果使用 PostgreSQL，您可能需要初始化数据库表：
-1. 通过 Railway 控制台的 Web Shell 连接到应用
+1. 通过 Render 控制台的 Shell 连接到应用
 2. 运行：`python3 init_database.py`
 
 ### 监控和日志
 
-Railway 提供内置监控：
+Render 提供内置监控：
 - 在 "Logs" 标签页查看应用日志
 - 在 "Metrics" 标签页查看性能指标
 - 设置警报通知
-
-## 其他部署方案（备选）
-
-### 1. Render.com
-
-Render 是另一个类似 Railway 的平台：
-1. 注册 [render.com](https://render.com)
-2. 连接 GitHub 仓库
-3. 选择 "Web Service"
-4. 配置环境变量和部署设置
-
-### 2. Heroku
-
-Heroku 是经典的 PaaS 平台：
-1. 安装 Heroku CLI
-2. 运行：`heroku create`
-3. 配置环境变量：`heroku config:set VAR=value`
-4. 部署：`git push heroku main`
-
-### 3. 自建 VPS
-
-如果您有自己的 VPS：
-1. 安装 Docker 和 Docker Compose
-2. 使用提供的 Dockerfile 构建镜像
-3. 配置 Nginx 反向代理和 SSL
-4. 使用域名和 SSL 证书
 
 ## iPhone 使用技巧
 
@@ -133,8 +144,8 @@ Heroku 是经典的 PaaS 平台：
 
 ### 应用加载缓慢
 
-1. 检查 Railway 项目状态：确保服务正在运行
-2. 查看日志：在 Railway 控制台的 "Logs" 标签页
+1. 检查 Render 项目状态：确保服务正在运行
+2. 查看日志：在 Render 控制台的 "Logs" 标签页
 3. 检查环境变量：确保数据库连接正确
 
 ### 数据同步问题
@@ -147,7 +158,7 @@ Heroku 是经典的 PaaS 平台：
 
 1. 确认 Service Worker 已安装：Safari 开发者菜单 > Web 检查器 > 控制台
 2. 清除缓存后重新访问应用
-3. 确保使用 HTTPS（Railway 自动提供）
+3. 确保使用 HTTPS（Render 自动提供）
 
 ## 安全考虑
 
@@ -158,6 +169,6 @@ Heroku 是经典的 PaaS 平台：
 
 ## 结论
 
-通过 Railway 部署后，您的通勤记录应用将可在任何支持 Web 的设备上访问，包括 iPhone。PWA 特性使其体验接近原生应用，同时保留了 Web 应用的灵活性。
+通过 Render 部署后，您的通勤记录应用将可在任何支持 Web 的设备上访问，包括 iPhone。PWA 特性使其体验接近原生应用，同时保留了 Web 应用的灵活性。
 
 整个过程只需要几分钟，无需复杂的服务器配置，非常适合个人项目快速上线。
