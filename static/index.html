@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>通勤时间记录</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
+    <!-- iOS特定meta标签 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="通勤记录">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%238B6F47' width='192' height='192' rx='48'/%3E%3Ctext x='96' y='130' font-size='100' text-anchor='middle' fill='white'%3E🚗%3C/text%3E%3C/svg%3E">
+    
+    <!-- 主题颜色 -->
+    <meta name="theme-color" content="#8B6F47">
+    <meta name="msapplication-TileColor" content="#8B6F47">
+    
+    <!-- SEO和描述 -->
+    <meta name="description" content="记录和分析每日通勤时间，优化通勤方案">
+    <meta name="keywords" content="通勤,时间记录,数据分析,出行">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 美拉德色系配色 */
+        :root {
+            --maillard-brown: #8B6F47;
+            --maillard-caramel: #B8956A;
+            --maillard-cream: #E8DCC4;
+            --maillard-beige: #F5EFE6;
+            --maillard-dark: #5C4A3A;
+            --maillard-light: #D4C5B0;
+            --maillard-accent: #A67C52;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #F5EFE6 0%, #E8DCC4 100%);
+            min-height: 100vh;
+        }
+        
+        .tab-active {
+            border-bottom: 3px solid var(--maillard-brown);
+            color: var(--maillard-brown);
+            background: var(--maillard-beige);
+        }
+        
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button:hover {
+            background: var(--maillard-cream);
+        }
+        
+        .emoji-rating {
+            display: inline-flex;
+            gap: 0.5rem;
+        }
+        .emoji {
+            cursor: pointer;
+            font-size: 2rem;
+            transition: all 0.3s;
+            filter: grayscale(100%);
+            opacity: 0.4;
+        }
+        .emoji.active {
+            filter: grayscale(0%);
+            opacity: 1;
+            transform: scale(1.2);
+        }
+        .emoji:hover {
+            filter: grayscale(0%);
+            opacity: 1;
+            transform: scale(1.15);
+        }
+        .time-button {
+            transition: all 0.3s;
+            background: var(--maillard-brown);
+            box-shadow: 0 2px 4px rgba(92, 74, 58, 0.2);
+        }
+        .time-button:hover {
+            background: var(--maillard-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(92, 74, 58, 0.3);
+        }
+        .time-button.recorded {
+            background: linear-gradient(135deg, #A67C52 0%, #8B6F47 100%);
+            color: white;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 12px rgba(92, 74, 58, 0.2);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(139, 111, 71, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--maillard-brown);
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .card-maillard {
+            background: white;
+            border: 1px solid var(--maillard-light);
+            box-shadow: 0 2px 8px rgba(139, 111, 71, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card-maillard:hover {
+            box-shadow: 0 4px 16px rgba(139, 111, 71, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--maillard-brown) 0%, var(--maillard-accent) 100%);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--maillard-dark) 0%, var(--maillard-brown) 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(92, 74, 58, 0.3);
+        }
+        
+        .input-maillard {
+            border: 2px solid var(--maillard-light);
+            transition: all 0.3s ease;
+        }
+        
+        .input-maillard:focus {
+            border-color: var(--maillard-brown);
+            box-shadow: 0 0 0 3px rgba(139, 111, 71, 0.1);
+        }
+        
+        /* PWA特定样式 */
+        .pwa-mode {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        /* iOS安全区域适配 */
+        @supports (padding: max(0px)) {
+            body {
+                padding-left: max(0px, env(safe-area-inset-left));
+                padding-right: max(0px, env(safe-area-inset-right));
+            }
+            
+            .fixed {
+                padding-left: max(0px, env(safe-area-inset-left));
+                padding-right: max(0px, env(safe-area-inset-right));
+            }
+        }
+        
+        /* 触摸优化 */
+        @media (hover: none) and (pointer: coarse) {
+            .tab-button,
+            .time-button,
+            .btn-primary,
+            button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            .emoji {
+                font-size: 2.5rem;
+                padding: 0.5rem;
+            }
+        }
+        
+        /* 防止iOS双击缩放 */
+        * {
+            touch-action: manipulation;
+        }
+        
+        /* 滚动优化 */
+        .overflow-y-auto {
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 隐藏iOS默认的输入框阴影 */
+        input,
+        textarea,
+        select {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        /* 用户编辑弹窗样式 */
+        #userEditModal .emoji-option {
+            transition: all 0.2s ease;
+        }
+        
+        #userEditModal .emoji-option:hover {
+            transform: scale(1.25);
+        }
+        
+        #userEditModal input[type="radio"]:checked + div {
+            color: var(--maillard-brown);
+        }
+        
+        #userEditModal label:has(input[type="radio"]:checked) {
+            border-color: var(--maillard-brown);
+            background: var(--maillard-beige);
+        }
+        
+        #previewAvatar {
+            transition: all 0.3s ease;
+        }
+        
+        #previewAvatar:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="bg-white shadow-lg" style="border-bottom: 3px solid var(--maillard-light);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <span class="text-3xl mr-3">🚗</span>
+                    <h1 class="text-xl font-bold" style="color: var(--maillard-dark);">通勤时间记录 ⏱️</h1>
+                </div>
+                <div id="userInfo" class="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity" title="点击编辑用户信息">
+                    <div class="loading"></div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 用户信息编辑弹窗 -->
+    <div id="userEditModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" style="color: var(--maillard-dark);">✏️ 编辑用户信息</h3>
+                <button id="btnCloseUserEdit" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    ×
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- 头像预览 -->
+                <div class="flex justify-center mb-4">
+                    <div class="relative">
+                        <img id="previewAvatar" src="" alt="头像预览" class="w-24 h-24 rounded-full border-4 border-gray-200">
+                        <div class="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow-lg">
+                            <span class="text-2xl">✏️</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 姓名输入 -->
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">
+                        👤 显示姓名
+                    </label>
+                    <input type="text" id="editUserName" 
+                        class="w-full px-4 py-2 border-2 rounded-lg input-maillard focus:outline-none"
+                        placeholder="请输入显示姓名">
+                </div>
+                
+                <!-- 头像选择方式 -->
+                <div>
+                    <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">
+                        🖼️ 头像设置
+                    </label>
+                    <div class="space-y-3">
+                        <!-- 使用系统头像 -->
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="avatarType" value="system" checked class="mr-3">
+                            <div>
+                                <div class="font-medium">使用系统头像</div>
+                                <div class="text-sm text-gray-500">使用企业系统的默认头像</div>
+                            </div>
+                        </label>
+                        
+                        <!-- 使用Emoji -->
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="avatarType" value="emoji" class="mr-3">
+                            <div class="flex-1">
+                                <div class="font-medium">使用Emoji头像</div>
+                                <div class="text-sm text-gray-500 mb-2">选择一个喜欢的表情</div>
+                                <div id="emojiPicker" class="grid grid-cols-6 gap-2 text-2xl">
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="😀">😀</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="😊">😊</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="😎">😎</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🤓">🤓</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="😺">😺</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🐶">🐶</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🐱">🐱</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🐼">🐼</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🦊">🦊</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🐻">🐻</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🚗">🚗</span>
+                                    <span class="emoji-option cursor-pointer hover:scale-125 transition-transform" data-emoji="🚇">🚇</span>
+                                </div>
+                            </div>
+                        </label>
+                        
+                        <!-- 使用自定义URL -->
+                        <label class="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="radio" name="avatarType" value="url" class="mr-3">
+                            <div class="flex-1">
+                                <div class="font-medium">自定义图片URL</div>
+                                <input type="url" id="customAvatarUrl" 
+                                    class="w-full mt-2 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="https://example.com/avatar.jpg"
+                                    disabled>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 按钮组 -->
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button id="btnResetUserInfo" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                        🔄 恢复默认
+                    </button>
+                    <button id="btnSaveUserInfo" class="px-6 py-2 btn-primary rounded-lg">
+                        💾 保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab导航 -->
+    <div class="bg-white" style="border-bottom: 2px solid var(--maillard-cream);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <button id="tabRecord" class="tab-button py-4 px-2 font-medium tab-active rounded-t-lg">
+                    ✍️ 记录通勤
+                </button>
+                <button id="tabHistory" class="tab-button py-4 px-2 font-medium rounded-t-lg">
+                    📚 历史记录
+                </button>
+                <button id="tabAnalysis" class="tab-button py-4 px-2 font-medium rounded-t-lg">
+                    📊 数据分析
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 记录页面 -->
+        <div id="pageRecord" class="page-content">
+            <div class="card-maillard rounded-xl p-6 max-w-2xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6 flex items-center" style="color: var(--maillard-dark);">
+                    <span class="text-3xl mr-3">📝</span>
+                    创建通勤记录
+                </h2>
+                
+                <!-- 基本信息 -->
+                <div class="space-y-4 mb-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                📅 日期
+                            </label>
+                            <input type="date" id="recordDate" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                📆 星期
+                            </label>
+                            <input type="text" id="recordWeekday" readonly class="input-maillard w-full px-3 py-2 rounded-lg" style="background: var(--maillard-beige);">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                🌤️ 天气
+                            </label>
+                            <select id="recordWeather" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                🌡️ 温度
+                            </label>
+                            <input type="text" id="recordTemperature" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                🚌 出行方式
+                            </label>
+                            <select id="recordTransport" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                                <option value="subway">🚇 地铁</option>
+                                <option value="car">🚗 开车</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                                💼 通勤类型
+                            </label>
+                            <select id="recordCommuteType" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                                <option value="to_work">🌅 上班</option>
+                                <option value="from_work">🌆 下班</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 时间记录 -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-2xl mr-2">⏰</span>
+                        时间记录
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--maillard-beige);">
+                            <div>
+                                <div class="font-medium flex items-center" style="color: var(--maillard-dark);">
+                                    <span class="mr-2">🚪</span>
+                                    1. 出门
+                                </div>
+                                <div id="startTimeDisplay" class="text-sm" style="color: var(--maillard-accent);">未记录</div>
+                            </div>
+                            <button id="btnStartTime" class="time-button px-6 py-2 text-white rounded-lg">
+                                ⏱️ 记录时间
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--maillard-beige);">
+                            <div>
+                                <div class="font-medium flex items-center" style="color: var(--maillard-dark);">
+                                    <span class="mr-2">🚌</span>
+                                    2. 上车/上地铁
+                                </div>
+                                <div id="onVehicleTimeDisplay" class="text-sm" style="color: var(--maillard-accent);">未记录</div>
+                            </div>
+                            <button id="btnOnVehicleTime" class="time-button px-6 py-2 text-white rounded-lg opacity-50" disabled>
+                                ⏱️ 记录时间
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 rounded-lg" style="background: var(--maillard-beige);">
+                            <div>
+                                <div class="font-medium flex items-center" style="color: var(--maillard-dark);">
+                                    <span class="mr-2">🏢</span>
+                                    3. 到达
+                                </div>
+                                <div id="arriveTimeDisplay" class="text-sm" style="color: var(--maillard-accent);">未记录</div>
+                            </div>
+                            <button id="btnArriveTime" class="time-button px-6 py-2 text-white rounded-lg opacity-50" disabled>
+                                ⏱️ 记录时间
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="durationSummary" class="mt-4 p-4 rounded-lg hidden" style="background: var(--maillard-cream); border: 2px solid var(--maillard-light);">
+                        <div class="text-sm space-y-1" style="color: var(--maillard-dark);">
+                            <div class="flex items-center">
+                                <span class="mr-2">🚶</span>
+                                出门到上车：<span id="duration1" class="font-semibold ml-2">-</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="mr-2">🚗</span>
+                                上车到到达：<span id="duration2" class="font-semibold ml-2">-</span>
+                            </div>
+                            <div class="text-lg font-bold mt-2 flex items-center" style="color: var(--maillard-brown);">
+                                <span class="mr-2">⏳</span>
+                                总时长：<span id="totalDuration" class="ml-2">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 评分 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-xl mr-2">💯</span>
+                        通勤体验评分
+                    </label>
+                    <div class="emoji-rating" id="emojiRating">
+                        <span class="emoji" data-rating="1" title="很差">😢</span>
+                        <span class="emoji" data-rating="2" title="不好">😕</span>
+                        <span class="emoji" data-rating="3" title="一般">😐</span>
+                        <span class="emoji" data-rating="4" title="不错">😊</span>
+                        <span class="emoji" data-rating="5" title="很好">😄</span>
+                    </div>
+                </div>
+
+                <!-- 备注 -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2 flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-xl mr-2">📋</span>
+                        备注
+                    </label>
+                    <textarea id="recordNotes" rows="3" class="input-maillard w-full px-3 py-2 rounded-lg outline-none" placeholder="记录今天通勤的特殊情况... 💭"></textarea>
+                </div>
+
+                <!-- 提交按钮 -->
+                <button id="btnSubmit" class="btn-primary w-full py-3 rounded-lg font-medium text-lg">
+                    💾 保存记录
+                </button>
+            </div>
+        </div>
+
+        <!-- 历史记录页面 -->
+        <div id="pageHistory" class="page-content hidden">
+            <div class="card-maillard rounded-xl p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-3xl mr-3">📚</span>
+                        历史记录
+                    </h2>
+                    <button id="btnFilter" class="px-4 py-2 rounded-lg hover:shadow-md transition-all" style="background: var(--maillard-cream); color: var(--maillard-dark);">
+                        🔍 筛选
+                    </button>
+                </div>
+
+                <!-- 筛选面板 -->
+                <div id="filterPanel" class="mb-6 p-4 rounded-lg hidden" style="background: var(--maillard-beige); border: 2px solid var(--maillard-light);">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">📅 开始日期</label>
+                            <input type="date" id="filterStartDate" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">📅 结束日期</label>
+                            <input type="date" id="filterEndDate" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">🚌 出行方式</label>
+                            <select id="filterTransport" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                                <option value="">全部</option>
+                                <option value="subway">🚇 地铁</option>
+                                <option value="car">🚗 开车</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2" style="color: var(--maillard-dark);">💼 通勤类型</label>
+                            <select id="filterCommuteType" class="input-maillard w-full px-3 py-2 rounded-lg outline-none">
+                                <option value="">全部</option>
+                                <option value="to_work">🌅 上班</option>
+                                <option value="from_work">🌆 下班</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-end space-x-2">
+                        <button id="btnResetFilter" class="px-4 py-2 rounded-lg hover:shadow-md transition-all" style="background: var(--maillard-light); color: var(--maillard-dark);">🔄 重置</button>
+                        <button id="btnApplyFilter" class="btn-primary px-4 py-2 rounded-lg">✅ 应用</button>
+                    </div>
+                </div>
+
+                <!-- 记录列表 -->
+                <div id="recordsList" class="space-y-4">
+                    <div class="text-center py-8 text-gray-500">
+                        <div class="loading mx-auto mb-2"></div>
+                        <div>加载中...</div>
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div id="pagination" class="mt-6 flex justify-center space-x-2 hidden">
+                </div>
+            </div>
+        </div>
+
+        <!-- 数据分析页面 -->
+        <div id="pageAnalysis" class="page-content hidden">
+            <div class="space-y-6">
+                <div class="card-maillard rounded-xl p-6">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-3xl mr-3">📊</span>
+                        数据分析
+                    </h2>
+                    
+                    <!-- 基础统计卡片 -->
+                    <div id="basicStats" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #E8DCC4 0%, #D4C5B0 100%);">
+                            <div class="text-sm mb-1" style="color: var(--maillard-dark);">📈 总通勤次数</div>
+                            <div class="text-2xl font-bold" style="color: var(--maillard-brown);">-</div>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #D4C5B0 0%, #B8956A 100%);">
+                            <div class="text-sm mb-1" style="color: var(--maillard-dark);">⏱️ 平均时长</div>
+                            <div class="text-2xl font-bold" style="color: var(--maillard-brown);">-</div>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #F5EFE6 0%, #E8DCC4 100%);">
+                            <div class="text-sm mb-1" style="color: var(--maillard-dark);">🚀 最短时长</div>
+                            <div class="text-2xl font-bold" style="color: var(--maillard-accent);">-</div>
+                        </div>
+                        <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #B8956A 0%, #8B6F47 100%);">
+                            <div class="text-sm mb-1 text-white">🐌 最长时长</div>
+                            <div class="text-2xl font-bold text-white">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card-maillard rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                            <span class="text-xl mr-2">📈</span>
+                            通勤时间趋势
+                        </h3>
+                        <div id="chartTrend" style="height: 300px;"></div>
+                    </div>
+                    <div class="card-maillard rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                            <span class="text-xl mr-2">🚗</span>
+                            出行方式对比
+                        </h3>
+                        <div id="chartTransport" style="height: 300px;"></div>
+                    </div>
+                    <div class="card-maillard rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                            <span class="text-xl mr-2">📅</span>
+                            星期分布
+                        </h3>
+                        <div id="chartWeekday" style="height: 300px;"></div>
+                    </div>
+                    <div class="card-maillard rounded-xl p-6">
+                        <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                            <span class="text-xl mr-2">🥧</span>
+                            分段时间占比
+                        </h3>
+                        <div id="chartSegments" style="height: 300px;"></div>
+                    </div>
+                </div>
+
+                <!-- 智能建议 -->
+                <div class="card-maillard rounded-xl p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center" style="color: var(--maillard-dark);">
+                        <span class="text-2xl mr-2">💡</span>
+                        智能建议
+                    </h3>
+                    <div id="suggestions" class="space-y-3">
+                        <div class="text-center py-4" style="color: var(--maillard-accent);">
+                            <div class="loading mx-auto mb-2"></div>
+                            <div>分析中... 🤔</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 详情弹窗 -->
+    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" style="border: 3px solid var(--maillard-light);">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold flex items-center" style="color: var(--maillard-dark);">
+                    <span class="text-2xl mr-2">📋</span>
+                    记录详情
+                </h3>
+                <button id="btnCloseModal" class="hover:opacity-70 transition-opacity" style="color: var(--maillard-accent);">
+                    <span class="text-2xl">✖️</span>
+                </button>
+            </div>
+            <div id="detailContent"></div>
+            <div class="mt-6 flex justify-end space-x-2">
+                <button id="btnDeleteRecord" class="px-4 py-2 text-white rounded-lg hover:opacity-90 transition-opacity" style="background: #C17767;">
+                    🗑️ 删除
+                </button>
+                <button id="btnCloseModal2" class="px-4 py-2 rounded-lg hover:shadow-md transition-all" style="background: var(--maillard-light); color: var(--maillard-dark);">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
